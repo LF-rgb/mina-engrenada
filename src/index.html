@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>Mina Engrenada</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <header id="topbar">
+      <div class="brand"><span class="brand-gear">⚙</span> Mina Engrenada</div>
+      <div class="stat money" title="Saldo"><span class="ico coin"></span><b id="st-money">R$ 0</b></div>
+      <div class="stat" title="Energia: geração / demanda"><span class="ico bolt">⚡</span><div class="powerbar"><i id="st-powerfill"></i></div><b id="st-power">0 / 0 kW</b></div>
+      <div class="stat" title="Itens produzidos por minuto (extração + processamento)"><span class="lbl">Produção</span><b id="st-prod">0/min</b></div>
+      <div class="stat" title="Lucro líquido do último minuto (vendas − custos operacionais)"><span class="lbl">Lucro</span><b id="st-profit">R$ 0/min</b></div>
+      <div class="spacer"></div>
+      <div class="speed" id="speed">
+        <button data-speed="0" title="Pausar (Espaço)">❚❚</button>
+        <button data-speed="1" class="on" title="Velocidade normal">1×</button>
+        <button data-speed="2" title="Velocidade 2×">2×</button>
+        <button data-speed="3" title="Velocidade 3×">3×</button>
+      </div>
+      <button class="tb" id="btn-alerts" title="Alertas"><span>🔔</span><em id="alert-count" class="hidden">0</em></button>
+      <button class="tb" id="btn-tech" title="Tecnologias (T)">🔬 <span>Tecnologia</span></button>
+      <button class="tb" id="btn-fin" title="Finanças (G)">📈 <span>Finanças</span></button>
+      <button class="tb" id="btn-map" title="Mapa e regiões (M)">🗺 <span>Mapa</span></button>
+      <button class="tb" id="btn-menu" title="Menu (Esc)">☰</button>
+    </header>
+    <div id="alerts-pop" class="pop hidden"></div>
+
+    <section id="objective" class="card">
+      <div class="obj-head"><span>OBJETIVO</span><em id="obj-count"></em></div>
+      <div id="obj-text"></div>
+      <div class="bar"><i id="obj-fill"></i></div>
+      <div class="obj-foot"><span id="obj-prog"></span><span id="obj-reward"></span></div>
+      <div id="obj-hint"></div>
+    </section>
+
+    <section id="selpanel" class="card hidden"></section>
+
+    <div id="hint"></div>
+
+    <nav id="buildbar">
+      <div id="cats"></div>
+      <div id="items"></div>
+    </nav>
+    <div id="tooltip" class="hidden"></div>
+
+    <div id="minimap-wrap" class="card"><canvas id="minimap" width="240" height="180"></canvas><div class="mm-label">Mapa (M)</div></div>
+  </div>
+
+  <div id="toasts"></div>
+  <div id="modal-root"></div>
+
+  <div id="mainmenu" class="hidden">
+    <div class="mm-panel">
+      <div class="title"><span class="brand-gear big">⚙</span><h1>Mina Engrenada</h1><p>Minere, transporte, processe e construa seu império industrial.</p></div>
+      <div class="mm-buttons" id="mm-buttons"></div>
+      <div class="mm-foot">v1.0 · Teclado e mouse · Funciona offline</div>
+    </div>
+  </div>
+
+  <div id="loading"><div class="spinner"></div><p>Preparando o vale…</p></div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

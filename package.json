@@ -1,0 +1,25 @@
+{
+  "name": "mina-engrenada",
+  "productName": "Mina Engrenada",
+  "version": "1.0.0",
+  "description": "Jogo 3D de mineração, automação e construção industrial",
+  "main": "electron/main.js",
+  "type": "commonjs",
+  "author": "Luis Felipe Moscon Gomes",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "test": "node --test tests/simulation.test.mjs",
+    "dist:win": "node scripts/build.mjs && node scripts/package-win.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^38.8.6",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.64.0"
+  }
+}
