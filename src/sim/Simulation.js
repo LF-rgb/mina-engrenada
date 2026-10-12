@@ -35,6 +35,7 @@ export class Simulation {
     this.profitWindow = new Array(60).fill(0);
     this.curSec = { prod: 0, profit: 0 };
     this.alerts = [];
+    this.rateHist = [];
     if (!empty) this.setupNewGame();
   }
 
@@ -106,6 +107,12 @@ export class Simulation {
       if (t.rot === opposite(dir)) return false; // esteira apontando de volta
       if (!beltAccepts(this, t)) return false;
       beltInsert(this, t, res);
+      return true;
+    }
+    if (def.kind === 'crossing') {
+      if (t.items.filter((i) => i.d === dir).length >= 2) return false;
+      if (t.items.some((i) => i.d === dir && i.p < 0.5)) return false;
+      t.items.push({ r: res, p: 0, pp: 0, d: dir });
       return true;
     }
     // lado local por onde o item entra no destino
@@ -233,7 +240,7 @@ export class Simulation {
     return list;
   }
 
-  demolish(id) {
+  demolish(id, { refundRatio = SIM.demolishRefund } = {}) {
     const b = this.buildings.get(id);
     if (!b) return false;
     if (b.type === 'seller' && [...this.buildings.values()].filter((q) => q.type === 'seller').length <= 1) {
@@ -252,7 +259,7 @@ export class Simulation {
       }
       this.pigs = this.pigs.filter((p) => p.barn !== b.id);
     }
-    const refund = Math.floor(b.invested * SIM.demolishRefund);
+    const refund = Math.floor(b.invested * refundRatio);
     this.detach(b);
     if (refund > 0) this.economy.earn(refund, 'reembolso');
     if (liquid > 0) this.economy.earn(liquid, 'liquidacao');
@@ -311,6 +318,7 @@ export class Simulation {
     b.recipe = recipe || null;
     this.events.emit('changed', { b });
   }
+  setFilter(id, res) { const b = this.buildings.get(id); if (b && BUILDINGS[b.type].kind === 'sorter') { b.filter = RESOURCES[res] ? res : null; this.events.emit('changed', { b }); } }
   setOutputEnabled(id, on) { const b = this.buildings.get(id); if (b) b.outputEnabled = !!on; }
 
   treesNear(b) {
@@ -389,6 +397,8 @@ export class Simulation {
     this.profitWindow.push(this.curSec.profit); this.profitWindow.shift();
     this.curSec = { prod: 0, profit: 0 };
     for (const b of this.buildings.values()) { b.rate = b.rate * 0.85 + b.secCount * 60 * 0.15; b.secCount = 0; }
+    this.rateHist.push({ produced: { ...this.stats.produced }, sold: { ...this.stats.sold }, extracted: { ...this.stats.extracted } });
+    if (this.rateHist.length > 61) this.rateHist.shift();
     this.progression.check();
     this.economy.rollBucket();
     this.updateAlerts();
@@ -399,6 +409,19 @@ export class Simulation {
     this.stats.produced[res] = (this.stats.produced[res] || 0) + n;
     this.curSec.prod += n;
     if (b) b.secCount += n;
+  }
+
+  // itens por minuto, por recurso, na janela dos últimos ~60 s
+  ratesPerMin() {
+    const h = this.rateHist;
+    if (h.length < 2) return {};
+    const a = h[0], b = h[h.length - 1], k = 60 / (h.length - 1);
+    const out = {};
+    for (const key of ['produced', 'sold']) for (const r in b[key]) {
+      const v = (b[key][r] - (a[key][r] || 0)) * k;
+      if (v > 0) (out[r] ||= { produced: 0, sold: 0 })[key] = v;
+    }
+    return out;
   }
 
   get productionPerMin() { return this.prodWindow.reduce((a, c) => a + c, 0); }
@@ -436,7 +459,7 @@ export class Simulation {
     for (const b of this.buildings.values()) {
       buildings.push({
         id: b.id, type: b.type, x: b.x, z: b.z, rot: b.rot, level: b.level, enabled: b.enabled, invested: b.invested,
-        inv: b.inv, out: b.out, items: b.items.map((i) => [i.r, Math.round(i.p * 1000) / 1000]),
+        inv: b.inv, out: b.out, items: b.items.map((i) => (i.d != null ? [i.r, Math.round(i.p * 1000) / 1000, i.d] : [i.r, Math.round(i.p * 1000) / 1000])), filter: b.filter || null,
         progress: b.progress, crafting: b.crafting, recipe: b.recipe, fuel: b.fuel,
         outputEnabled: b.outputEnabled, rate: Math.round(b.rate * 10) / 10,
       });
@@ -482,7 +505,8 @@ export class Simulation {
         level: clampInt(s.level, 1, SIM.upgradeMaxLevel), enabled: s.enabled !== false, invested: +s.invested || 0,
         inv: cleanInv(s.inv), out: cleanInv(s.out), progress: +s.progress || 0, crafting: RECIPES[s.crafting] ? s.crafting : null,
         recipe: RECIPES[s.recipe] ? s.recipe : null, fuel: +s.fuel || 0, outputEnabled: s.outputEnabled !== false, rate: +s.rate || 0,
-        items: (s.items || []).filter((i) => RESOURCES[i[0]]).map(([r, p]) => ({ r, p: +p, pp: +p })),
+        items: (s.items || []).filter((i) => RESOURCES[i[0]]).map(([r, p, d]) => (d != null ? { r, p: +p, pp: +p, d: d & 3 } : { r, p: +p, pp: +p })),
+        filter: RESOURCES[s.filter] ? s.filter : null,
       });
       b.items.sort((a, c) => c.p - a.p);
       sim.attach(b);

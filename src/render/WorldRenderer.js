@@ -140,6 +140,8 @@ export class WorldRenderer {
       if (!n) return false;
       const moveDir = (fromDir + 2) & 3;
       if (BUILDINGS[n.type].kind === 'belt') return n.rot === moveDir;
+      if (BUILDINGS[n.type].kind === 'crossing') return true;
+      if (BUILDINGS[n.type].kind === 'sorter') return moveDir === n.rot || moveDir === ((n.rot + 3) & 3);
       return sim.outputTargets(n).some((t) => t.x === b.x && t.z === b.z && t.dir === moveDir);
     };
     if (feeds((r + 2) & 3)) return 'S';
@@ -183,6 +185,18 @@ export class WorldRenderer {
     const counts = {};
     const sim = this.sim;
     for (const b of sim.buildings.values()) {
+      if (BUILDINGS[b.type].kind === 'crossing' && b.items.length) {
+        for (const it of b.items) {
+          const p = Math.max(0, Math.min(1, it.pp + (it.p - it.pp) * alpha)) - 0.5;
+          let im = this.itemMeshes[it.r];
+          const n = counts[it.r] || 0;
+          if (!im || n >= im.instanceMatrix.count) im = this.growItems(it.r, n + 1);
+          tmpM.compose(tmpP.set(b.x + 0.5 + DX[it.d] * p, 0.33, b.z + 0.5 + DZ[it.d] * p), tmpQ.setFromAxisAngle(UP, -it.d * Math.PI / 2), tmpS.set(1, 1, 1));
+          im.setMatrixAt(n, tmpM);
+          counts[it.r] = n + 1;
+        }
+        continue;
+      }
       if (BUILDINGS[b.type].kind !== 'belt' || !b.items.length) continue;
       const shape = b._shape || 'S';
       const ang = -b.rot * Math.PI / 2;
@@ -352,6 +366,13 @@ export class WorldRenderer {
     this.updateItems(sim.paused ? 1 : alpha);
     this.updatePigs(sim.paused ? 0 : dt, sim.paused ? 1 : alpha);
     this.updateEffects(dt);
+    if (this.marker?.visible) {
+      const { arrow, ring } = this.marker.userData;
+      arrow.position.y = 2.1 + Math.abs(Math.sin(this.time * 3)) * 0.5;
+      arrow.rotation.y += dt * 2;
+      const k = (this.time * 0.8) % 1;
+      ring.scale.setScalar(0.8 + k * 0.8); ring.material.opacity = 0.9 * (1 - k);
+    }
     // sombra acompanha a câmera
     const t = camCtl.target;
     const span = Math.max(20, camCtl.distance * 0.9);
@@ -453,6 +474,22 @@ export class WorldRenderer {
       disk.rotation.x = -Math.PI / 2; disk.position.set(n.cx, 0.05, n.cz);
       this.coverRoot.add(disk);
     }
+  }
+
+  setMarker(pos) {
+    if (!this.marker) {
+      const g = new THREE.Group();
+      const m = new THREE.MeshStandardMaterial({ color: 0xffcf5c, emissive: 0xf2b632, emissiveIntensity: 0.9 });
+      const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 4), m);
+      arrow.rotation.x = Math.PI; arrow.position.y = 2.2; g.add(arrow);
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 0.85, 40), new THREE.MeshBasicMaterial({ color: 0xffcf5c, transparent: true, opacity: 0.8, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; ring.position.y = 0.06; g.add(ring);
+      g.userData = { arrow, ring };
+      this.scene.add(g);
+      this.marker = g;
+    }
+    this.marker.visible = !!pos;
+    if (pos) this.marker.position.set(pos[0], 0, pos[1]);
   }
 
   setHover(x, z, visible) {

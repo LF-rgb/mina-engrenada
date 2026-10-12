@@ -405,6 +405,47 @@ const FACTORIES = {
     return { root, update() {} };
   },
 
+  crossing() {
+    const root = new THREE.Group();
+    box(0.96, 0.16, 0.96, mat(0x4a525c), 0, 0, 0, root);
+    // duas lonas em cruz, levemente elevadas
+    box(0.94, 0.04, 0.6, mat(0x3a3f47), 0, 0.16, 0, root);
+    box(0.6, 0.05, 0.94, mat(0x434954), 0, 0.17, 0, root);
+    // cantoneiras amarelas
+    for (const [x, z] of [[-0.4, -0.4], [0.4, -0.4], [-0.4, 0.4], [0.4, 0.4]]) box(0.14, 0.12, 0.14, mat(PAL.yellow), x, 0.16, z, root);
+    const hub = cyl(0.12, 0.12, 0.03, 12, mat(PAL.orange, { emissive: 0x803000, ei: 0.3 }), 0, 0.22, 0, root);
+    return { root, update(dt, t, b) { hub.rotation.y += dt * (b.state === 'working' ? 4 : 0.3); } };
+  },
+
+  sorter() {
+    const root = new THREE.Group();
+    box(0.9, 0.22, 0.9, mat(0x56606b), 0, 0, 0, root);
+    // braço desviador que gira para o lado quando separa
+    const arm = new THREE.Group();
+    box(0.5, 0.1, 0.06, mat(PAL.teal), 0.2, 0, 0, arm);
+    arm.position.set(-0.2, 0.24, 0); root.add(arm);
+    // sensor com a cor do recurso escolhido
+    const lensMat = new THREE.MeshStandardMaterial({ color: 0x777777, emissive: 0x222222, emissiveIntensity: 0.8 });
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.11, 12, 10), lensMat);
+    lens.position.set(-0.28, 0.42, 0.28); root.add(lens);
+    cyl(0.03, 0.03, 0.2, 6, mat(PAL.darkSteel), -0.28, 0.22, 0.28, root);
+    // setas: frente laranja, esquerda (−z local) azul
+    const fM = mat(PAL.orange, { emissive: 0x803000, ei: 0.4 }), lM = mat(0x6ad7ff, { emissive: 0x1a5a80, ei: 0.5 });
+    const af = cone(0.09, 0.18, 4, fM, 0, 0, 0, root); af.rotation.z = -Math.PI / 2; af.position.set(0.4, 0.3, 0);
+    const al = cone(0.09, 0.18, 4, lM, 0, 0, 0, root); al.rotation.x = -Math.PI / 2; al.position.set(0, 0.3, -0.4);
+    let target = 0;
+    return {
+      root,
+      update(dt, t, b) {
+        const res = Object.keys(b.inv)[0];
+        target = res && b.filter && res === b.filter ? -Math.PI / 2 : 0;
+        arm.rotation.y += (target - arm.rotation.y) * Math.min(1, dt * 12);
+        const c = b.filter ? RESOURCES[b.filter].color : 0x777777;
+        lensMat.color.setHex(c); lensMat.emissive.setHex(c);
+      },
+    };
+  },
+
   splitter() {
     const root = new THREE.Group();
     box(0.9, 0.22, 0.9, mat(0x56606b), 0, 0, 0, root);

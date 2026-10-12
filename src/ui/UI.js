@@ -314,6 +314,13 @@ export class UI {
         h += `<div class="sec">Itens (${b.items.length}/4)</div><div class="inv">${b.items.length ? b.items.map((i) => resChip(i.r)).join('') : '<span class="res empty">vazia</span>'}</div>`;
         h += `<div class="reason">Arraste com a esteira selecionada sobre esta para mudar a direção sem custo.</div>`;
         break;
+      case 'crossing':
+        h += kv('Itens atravessando', b.items.length) + `<div class="reason">Cada item segue reto na direção em que entrou. Use para cruzar duas linhas de esteira.</div>`;
+        break;
+      case 'sorter':
+        h += kv('Separando', b.filter ? resChip(b.filter) : '<span style="color:var(--orange)">nada escolhido</span>');
+        h += `<div class="sec">Buffer</div><div class="inv">${inv(b.inv)}</div><div class="reason">Entrada por trás. O recurso escolhido sai pela <b>esquerda</b> (seta azul); o restante segue em frente (seta laranja).</div>`;
+        break;
       case 'splitter':
         h += `<div class="sec">Buffer</div><div class="inv">${inv(b.inv)}</div><div class="reason">Entrada por trás; saídas em rodízio pela frente e laterais.</div>`;
         break;
@@ -351,6 +358,14 @@ export class UI {
       const rc = RECIPES[def.recipes[0]];
       c.innerHTML = `<div class="sec">Receita</div><div class="reason">${Object.entries(rc.in).map(([k, n]) => `${n} ${RESOURCES[k].name}`).join(' + ')} → ${Object.entries(rc.out).map(([k, n]) => `${n} ${RESOURCES[k].name}`).join(' + ')} (${rc.time}s)</div>`;
     }
+    if (def.kind === 'sorter') {
+      const s = el('select');
+      s.id = 'sp-filter';
+      s.innerHTML = '<option value="">— escolha o recurso —</option>' + Object.keys(RESOURCES).map((r) => `<option value="${r}" ${b.filter === r ? 'selected' : ''}>${RESOURCES[r].name}</option>`).join('');
+      s.onchange = () => { this.sim.setFilter(b.id, s.value); this.game.audio.play('click'); this.renderSelection(false); };
+      c.appendChild(el('div', 'sec', 'Recurso separado (sai pela esquerda)'));
+      c.appendChild(s);
+    }
     const a = $('#sp-act');
     a.innerHTML = '';
     const mk = (label, cls, fn, id) => { const bt = el('button', 'btn ' + cls, label); bt.onclick = fn; if (id) bt.id = id; a.appendChild(bt); return bt; };
@@ -358,7 +373,7 @@ export class UI {
       mk('', 'primary wide', () => this.game.upgradeSelected(), 'sp-up');
     }
     if (def.kind === 'workshop') mk('Abrir tecnologias (T)', 'primary wide', () => this.openTech());
-    if (!['belt', 'workshop', 'seller', 'pole'].includes(def.kind)) mk('', '', () => { this.sim.setEnabled(b.id, !b.enabled); this.game.audio.play('click'); this.renderSelection(false); }, 'sp-toggle');
+    if (!['belt', 'workshop', 'seller', 'pole', 'crossing', 'sorter', 'splitter'].includes(def.kind)) mk('', '', () => { this.sim.setEnabled(b.id, !b.enabled); this.game.audio.play('click'); this.renderSelection(false); }, 'sp-toggle');
     if (def.kind === 'storage' || def.kind === 'barn') mk('', '', () => { this.sim.setOutputEnabled(b.id, !b.outputEnabled); this.renderSelection(false); }, 'sp-out');
     mk('Mover (V)', '', () => this.game.input.startMove(b.id));
     mk('', 'danger', () => this.game.demolishSelected(), 'sp-del');
@@ -451,6 +466,7 @@ export class UI {
           <div><div class="h3">Últimos 30 minutos</div><canvas id="fin-chart" width="320" height="180" style="width:100%;background:rgba(255,255,255,.03);border-radius:10px"></canvas>
           <div style="font-size:12px;color:var(--muted);margin-top:4px"><span class="pos">■</span> Receitas <span class="neg">■</span> Despesas — linha: lucro líquido</div></div>
         </div>
+        <div style="margin-top:16px"><div class="h3">Produção e vendas por recurso (último minuto)</div>${this.rateTable()}</div>
         <div class="fin-cols" style="margin-top:16px">
           <div><div class="h3">Receitas por origem</div><table class="fin">${rows(inc, 'pos')}</table></div>
           <div><div class="h3">Despesas por categoria</div><table class="fin">${rows(exp, 'neg')}</table></div>
@@ -472,6 +488,18 @@ export class UI {
     };
     m.refresh = render;
     render();
+  }
+
+  rateTable() {
+    const rates = this.sim.ratesPerMin();
+    const keys = Object.keys(RESOURCES).filter((r) => rates[r]);
+    if (!keys.length) return '<div class="reason">Nenhuma produção no último minuto.</div>';
+    const rows = keys.map((r) => {
+      const x = rates[r];
+      const val = (x.sold || 0) * this.sim.economy.sellValue(r);
+      return `<tr><td>${resChip(r)}</td><td>${(x.produced || 0).toFixed(1)}</td><td>${(x.sold || 0).toFixed(1)}</td><td class="pos">${val ? formatMoney(val) : '—'}</td></tr>`;
+    }).join('');
+    return `<div style="overflow-x:auto"><table class="fin"><tr><th>Recurso</th><th>Produzido/min</th><th>Vendido/min</th><th>Receita/min</th></tr>${rows}</table></div>`;
   }
 
   openMap() {
@@ -555,7 +583,7 @@ export class UI {
     }
     g.drawImage(this._mapBase, 0, 0);
     // estruturas
-    const colors = { belt: '#e0a83a', miner: '#f2b632', processor: '#3cc8b4', generator: '#4fd67a', storage: '#d8c9a8', seller: '#ff6b5e', pole: '#6ad7ff', workshop: '#7fa8c9', barn: '#f4a9b8', lumber: '#9b6a3c', splitter: '#ffffff' };
+    const colors = { belt: '#e0a83a', miner: '#f2b632', processor: '#3cc8b4', generator: '#4fd67a', storage: '#d8c9a8', seller: '#ff6b5e', pole: '#6ad7ff', workshop: '#7fa8c9', barn: '#f4a9b8', lumber: '#9b6a3c', splitter: '#ffffff', crossing: '#e0a83a', sorter: '#3cc8b4' };
     for (const b of sim.buildings.values()) {
       const def = BUILDINGS[b.type];
       const [w, d] = sim.footprint(b.type, b.rot);
@@ -652,7 +680,7 @@ export class UI {
       ['W A S D / Setas', 'Mover a câmera'], ['Roda do mouse', 'Zoom'], ['Botão do meio + arrastar', 'Deslocar a câmera'], ['Q / E', 'Girar a câmera 90°'],
       ['Clique esquerdo', 'Selecionar / construir / confirmar'], ['Arrastar (esteira)', 'Construir linha de esteiras (em L)'], ['Clique direito', 'Cancelar construção / fechar seleção'],
       ['R', 'Girar estrutura antes de posicionar'], ['F1 … F6', 'Categorias de construção'], ['1 … 9', 'Escolher item da categoria'],
-      ['U', 'Melhorar estrutura selecionada'], ['V', 'Mover estrutura selecionada'], ['Delete', 'Demolir selecionada'], ['X', 'Modo demolição (arraste para remover esteiras)'],
+      ['U', 'Melhorar estrutura selecionada'], ['C', 'Copiar a estrutura sob o mouse (conta-gotas)'], ['Ctrl + Z', 'Desfazer a última construção (reembolso integral)'], ['V', 'Mover estrutura selecionada'], ['Delete', 'Demolir selecionada'], ['X', 'Modo demolição (arraste para remover esteiras)'],
       ['F', 'Enquadrar a seleção / voltar ao padrão'], ['Espaço', 'Pausar / retomar'], ['T · G · M', 'Tecnologias · Finanças · Mapa'], ['F5 / F9', 'Salvamento rápido / carregar rápido'], ['Esc', 'Fechar janelas / menu de pausa'],
     ];
     m.body.innerHTML = `<div class="keys">${rows.map(([k, v]) => `<div><kbd>${k}</kbd></div><div>${v}</div>`).join('')}</div>

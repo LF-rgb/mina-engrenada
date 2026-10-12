@@ -105,3 +105,38 @@ test('estabilidade com muitas estruturas', () => {
   assert.ok(Date.now() - t < 5000);
   assert.deepEqual(s.checkIntegrity(), []);
 });
+
+test('cruzamento: duas linhas se cruzam sem misturar nem perder itens', () => {
+  const s = new Simulation(); s.economy.money = 1e5;
+  s.placeBuilding('miner', 35, 27, 0);
+  for (let z = 27; z <= 33; z++) s.placeBuilding(z === 30 ? 'crossing' : 'conveyor', 37, z, 1);
+  for (let x = 37; x <= 39; x++) s.placeBuilding('conveyor', x, 34, 0);
+  for (let x = 34; x <= 36; x++) s.placeBuilding('conveyor', x, 30, 0);
+  for (let x = 38; x <= 40; x++) s.placeBuilding('conveyor', x, 30, 0);
+  const b0 = s.at(34, 30);
+  for (let k = 0; k < 3; k++) { b0.items.push({ r: 'iron_ore', p: 0.75 - k * 0.25, pp: 0 }); s.countCreated('iron_ore', 1); }
+  run(s, 40);
+  assert.ok(s.stats.sold.stone > 10, 'linha vertical vende pedra');
+  assert.equal(s.at(40, 30).items.filter((i) => i.r === 'iron_ore').length, 3, 'linha horizontal atravessou');
+  assert.ok(!s.stats.sold.iron_ore, 'ferro não desviou para a venda');
+  assert.deepEqual(s.checkIntegrity(), []);
+  const l = Simulation.deserialize(JSON.parse(JSON.stringify(s.serialize())));
+  assert.deepEqual(l.checkIntegrity(), []);
+});
+test('seletor: recurso escolhido sai pela esquerda, o resto em frente', () => {
+  const t = new Simulation(); t.economy.money = 1e5; t.progression.techs.u_splitter = 1; t.progression.techs.u_sorter = 1;
+  const so = t.placeBuilding('sorter', 40, 30, 1); t.setFilter(so.id, 'coal');
+  t.placeBuilding('conveyor', 41, 30, 0); t.placeBuilding('conveyor', 40, 31, 1);
+  so.inv.coal = 1; so.inv.stone = 1; t.countCreated('coal', 1); t.countCreated('stone', 1);
+  run(t, 2);
+  assert.deepEqual(t.at(41, 30).items.map((i) => i.r), ['coal']);
+  assert.deepEqual(t.at(40, 31).items.map((i) => i.r), ['stone']);
+  assert.deepEqual(t.checkIntegrity(), []);
+});
+test('desfazer devolve o valor integral', () => {
+  const s = new Simulation();
+  const b = s.placeBuilding('miner', 35, 27, 0);
+  assert.equal(s.economy.money, 500);
+  s.demolish(b.id, { refundRatio: 1 });
+  assert.equal(s.economy.money, 600);
+});

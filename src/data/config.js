@@ -86,12 +86,14 @@ export const FUELS = {
 // ---------------------------------------------------------------------
 // Estruturas
 // ---------------------------------------------------------------------
-// kind: belt | miner | processor | seller | storage | generator | pole | splitter | workshop | barn | platform | lumber
+// kind: belt | crossing | sorter | miner | processor | seller | storage | generator | pole | splitter | workshop | barn | platform | lumber
 // inputs: lados locais que aceitam itens: 0=frente 1=direita 2=trás 3=esquerda ; outputs: lados que emitem
 export const BUILDINGS = {
   conveyor:     { name: 'Esteira',             cat: 'transport',  kind: 'belt',      size: [1, 1], cost: 5,    speed: 1.0, desc: 'Transporta itens. Arraste para construir em linha.' },
   fast_conveyor:{ name: 'Esteira Rápida',      cat: 'transport',  kind: 'belt',      size: [1, 1], cost: 15,   speed: 2.2, tech: 'u_fast_belt', desc: 'Mais que o dobro da velocidade.' },
   splitter:     { name: 'Divisor',             cat: 'transport',  kind: 'splitter',  size: [1, 1], cost: 40,   tech: 'u_splitter', inputs: [2], outputs: [0, 1, 3], desc: 'Distribui itens alternadamente para frente, esquerda e direita.' },
+  crossing:     { name: 'Cruzamento',          cat: 'transport',  kind: 'crossing',  size: [1, 1], cost: 25,   speed: 1.2, desc: 'Permite que duas linhas de esteira se cruzem: cada item segue reto na direção em que entrou.' },
+  sorter:       { name: 'Seletor',             cat: 'transport',  kind: 'sorter',    size: [1, 1], cost: 80,   tech: 'u_sorter', inputs: [2], outputs: [0, 3], desc: 'Envia o recurso escolhido para a esquerda; o restante segue em frente.' },
   miner:        { name: 'Mineradora',          cat: 'mining',     kind: 'miner',     size: [2, 2], cost: 100,  rate: 0.5, hardness: 1, outputs: [0], power: 0, desc: 'Extrai minério dos depósitos sob ela (2×2).' },
   adv_drill:    { name: 'Perfuratriz Avançada',cat: 'mining',     kind: 'miner',     size: [2, 2], cost: 1200, rate: 1.2, hardness: 2, outputs: [0], power: 12, upkeep: 8, tech: 'u_adv_drill', desc: 'Rápida, extrai ouro e cristais. Requer energia.' },
   lumber:       { name: 'Acampamento Madeireiro',cat:'mining',    kind: 'lumber',    size: [2, 2], cost: 250,  rate: 0.4, radius: 3, outputs: [0], tech: 'u_lumber', desc: 'Corta árvores num raio de 3 tiles.' },
@@ -126,6 +128,7 @@ export const TECHS = {
   u_smelter:    { name: 'Fundição',              type: 'unlock', cost: [500],  req: [],               desc: 'Libera a Fundição (exige energia).' },
   u_generator:  { name: 'Geração de Energia',    type: 'unlock', cost: [400],  req: [],               desc: 'Libera o Gerador.' },
   u_splitter:   { name: 'Divisores',             type: 'unlock', cost: [300],  req: [],               desc: 'Libera o Divisor de esteira.' },
+  u_sorter:     { name: 'Seletores',             type: 'unlock', cost: [600],  req: ['u_splitter'], desc: 'Libera o Seletor, que separa um recurso específico da linha.' },
   u_lumber:     { name: 'Silvicultura',          type: 'unlock', cost: [300],  req: [],               desc: 'Libera o Acampamento Madeireiro.' },
   u_sawmill:    { name: 'Serraria',              type: 'unlock', cost: [450],  req: ['u_lumber'],     desc: 'Libera a Serraria.' },
   u_pole:       { name: 'Rede Elétrica',         type: 'unlock', cost: [350],  req: ['u_generator'],  desc: 'Libera Torres de Energia.' },

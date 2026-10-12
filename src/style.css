@@ -121,7 +121,9 @@ select { width: 100%; background: #1b2436; color: var(--text); border: 1px solid
 #tooltip .req { color: var(--red); margin-top: 6px; }
 #tooltip .meta { color: var(--muted); margin-top: 6px; font-size: 12px; }
 
-#hint { position: fixed; left: 12px; bottom: 12px; z-index: 11; font-size: 12.5px; color: #d6dfeb; background: rgba(10,15,27,0.75); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; max-width: 360px; line-height: 1.5; }
+#hint { position: fixed; left: 12px; bottom: 12px; z-index: 11; font-size: 12.5px; color: #d6dfeb; background: rgba(10,15,27,0.75); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; max-width: 280px; line-height: 1.5; }
+@media (max-width: 1500px) { #hint { font-size: 12px; max-width: min(280px, calc(50vw - 380px)); } }
+@media (max-width: 1300px) { #hint { display: none; } }
 #hint kbd, .keys kbd { background: rgba(255,255,255,0.12); border-radius: 4px; padding: 0 5px; font-family: inherit; font-size: 11.5px; border-bottom: 2px solid rgba(0,0,0,.3); }
 
 #minimap-wrap { right: 12px; bottom: 12px; padding: 6px; }

@@ -37,6 +37,9 @@ class Game {
     // primeira interação libera o áudio (política do Chromium)
     const unlock = () => { this.audio.init(); this.audio.resume(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
     window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock);
+    this.hoverTipEl = document.createElement('div');
+    this.hoverTipEl.style.cssText = 'position:fixed;z-index:44;pointer-events:none;background:rgba(11,17,32,.92);border:1px solid rgba(255,255,255,.12);color:#eef2f7;font:13px Segoe UI,Arial;padding:5px 9px;border-radius:7px;display:none;white-space:nowrap';
+    document.body.appendChild(this.hoverTipEl);
     this.cursorTip = document.createElement('div');
     this.cursorTip.style.cssText = 'position:fixed;z-index:45;pointer-events:none;background:rgba(160,30,30,.92);color:#fff;font:600 12px Segoe UI,Arial;padding:4px 8px;border-radius:6px;display:none';
     document.body.appendChild(this.cursorTip);
@@ -105,6 +108,9 @@ class Game {
 
   setSim(sim) {
     this.sim = sim;
+    this.undoStack = [];
+    this._stoneSpot = null;
+    this.renderer?.setMarker?.(null);
     this.renderer.setSim(sim);
     this.cam.map = sim.map;
     this.bindSimEvents();
@@ -227,6 +233,70 @@ class Game {
   }
   togglePause() { this.setSpeed(this.speed === 0 ? (this.prevSpeed || 1) : (this.prevSpeed = this.speed, 0)); }
 
+  // ------------------------------------------------------------ desfazer construções (reembolso integral)
+  pushUndo(ids) {
+    if (!ids || !ids.length) return;
+    (this.undoStack ||= []).push({ ids, t: this.sim.time });
+    if (this.undoStack.length > 30) this.undoStack.shift();
+  }
+  undo() {
+    const st = this.undoStack || [];
+    while (st.length) {
+      const e = st.pop();
+      const alive = e.ids.filter((id) => this.sim.buildings.has(id));
+      if (!alive.length) continue;
+      let back = 0;
+      const m0 = this.sim.economy.money;
+      for (const id of alive) this.sim.demolish(id, { refundRatio: 1 });
+      back = this.sim.economy.money - m0;
+      if (this.ui.selected && alive.includes(this.ui.selected.id)) this.ui.clearSelection();
+      this.audio.play('demolish');
+      this.ui.toast(`↶ Construção desfeita · +${formatMoney(back)}`);
+      return true;
+    }
+    this.ui.toast('Nada para desfazer', 'err');
+    return false;
+  }
+
+  setHoverTip(b, p) {
+    const t = this.hoverTipEl;
+    if (!b || this.input.mode !== 'select' || this.ui.hasModal()) { t.style.display = 'none'; return; }
+    const def = BUILDINGS[b.type];
+    const label = { working: 'operando', idle: 'ocioso', no_input: 'aguardando insumos', output_full: 'saída bloqueada', blocked: 'bloqueada', no_power: 'sem energia', no_fuel: 'sem combustível', no_deposit: 'sem recursos', off: 'desligado' }[b.state] || '';
+    const color = { working: '#4fd67a', no_power: '#ef5a50', no_fuel: '#ef5a50', no_deposit: '#ef5a50', output_full: '#f08a24', blocked: '#f08a24', off: '#9aa' }[b.state] || '#ffd84a';
+    t.innerHTML = `<b>${def.name}</b>${b.level > 1 ? ` · nv ${b.level}` : ''}${label ? ` · <span style="color:${color}">${label}</span>` : ''}`;
+    t.style.display = 'block';
+    t.style.left = this.cam.mouse.x + 16 + 'px';
+    t.style.top = this.cam.mouse.y + 18 + 'px';
+  }
+
+  // alvo do marcador no mundo para os primeiros objetivos (ensina onde agir)
+  objectiveTarget() {
+    const o = this.sim.progression.current();
+    if (!o) return null;
+    const s = this.sim;
+    const seller = [...s.buildings.values()].find((b) => b.type === 'seller');
+    const miner = [...s.buildings.values()].find((b) => b.type === 'miner');
+    if (o.id === 'o1') {
+      if (!this._stoneSpot) {
+        const [sx, sz] = seller ? s.center(seller) : [41, 34];
+        let best = null, bd = 1e9;
+        for (let z = 22; z < 48; z++) for (let x = 30; x < 56; x++) {
+          const d = s.map.depositInfo(x, z);
+          if (!d || d.res !== 'stone') continue;
+          const ok = s.canPlace('miner', x, z, 0, { free: true }).ok;
+          const dist = Math.hypot(x + 1 - sx, z + 1 - sz);
+          if (ok && dist < bd) { bd = dist; best = [x + 1, z + 1]; }
+        }
+        this._stoneSpot = best;
+      }
+      return this._stoneSpot;
+    }
+    if ((o.id === 'o2' || o.id === 'o3') && miner) { const t = s.outputTargets(miner)[0]; return t ? [t.x + 0.5, t.z + 0.5] : null; }
+    if ((o.id === 'o5') && seller) return s.center(seller);
+    return null;
+  }
+
   upgradeSelected() {
     const id = this.ui.selected?.id;
     if (id && this.sim.upgrade(id)) this.ui.renderSelection(false);
@@ -302,6 +372,7 @@ class Game {
       if (this.uiAcc > 0.25) {
         this.uiAcc = 0;
         this.ui.update();
+        this.renderer.setMarker(this.objectiveTarget());
         this.ui.drawMap(document.getElementById('minimap'));
         for (const m of this.ui.modalStack) if (m.kind === 'fin' || m.kind === 'map') m.refresh?.();
         let mach = 0, belts = 0;

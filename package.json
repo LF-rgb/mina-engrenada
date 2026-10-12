@@ -1,7 +1,7 @@
 {
   "name": "mina-engrenada",
   "productName": "Mina Engrenada",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Jogo 3D de mineração, automação e construção industrial",
   "main": "electron/main.js",
   "type": "commonjs",

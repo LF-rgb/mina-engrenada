@@ -2,6 +2,17 @@
 
 Jogo 3D de mineração, automação e construção industrial para Windows (10/11, 64 bits). Funciona offline, com teclado e mouse.
 
+## Novidades da versão 1.1
+
+- **Cruzamento** (Transporte): duas linhas de esteira se cruzam sem misturar os itens.
+- **Seletor** (Transporte, pesquisa "Seletores"): separa um recurso escolhido para a esquerda; o restante segue em frente.
+- **Desfazer** com Ctrl+Z: remove a última construção com reembolso integral.
+- **Conta-gotas** com C: copia a estrutura sob o mouse, com a mesma rotação.
+- **Dica ao passar o mouse** sobre qualquer estrutura (nome, nível e estado).
+- **Seta guia** no mapa indicando onde cumprir os primeiros objetivos.
+- **Produção e vendas por recurso** na tela de Finanças (G).
+- Correções: erro interno após construir uma estrutura; aviso vermelho que ficava preso na tela; caixa de atalhos sobreposta em telas menores.
+
 ## Como jogar (versão pronta)
 
 1. Descompacte `MinaEngrenada-Windows-x64.zip` em qualquer pasta.
@@ -26,6 +37,8 @@ Os salvamentos ficam em `%APPDATA%\Mina Engrenada\saves` (um arquivo JSON por es
 | 1 a 9 | Item da categoria |
 | Shift + clique | Construir várias seguidas |
 | U | Melhorar estrutura selecionada |
+| C | Copiar a estrutura sob o mouse |
+| Ctrl + Z | Desfazer a última construção (reembolso integral) |
 | V | Mover estrutura selecionada |
 | Delete | Demolir selecionada |
 | X | Modo demolição (arraste para remover esteiras) |
@@ -49,7 +62,7 @@ Cada máquina mostra **setas verdes (entradas)** e **seta laranja (saída)** ao 
 
 **Recursos (19):** pedra, carvão, minério de ferro, cobre, ouro, cristal, madeira; cascalho, pós metálicos, fragmentos de cristal, tábuas; lingotes de ferro, cobre e ouro, vigas de aço, circuitos e prismas. Depósitos têm quantidade finita, esgotamento e regeneração lenta configurável. Ouro e cristal exigem a Perfuratriz Avançada.
 
-**Estruturas (17), todas com modelo 3D próprio e animado:** Esteira, Esteira Rápida, Divisor, Mineradora, Perfuratriz Avançada, Acampamento Madeireiro, Triturador, Serraria, Fundição, Refinaria, Gerador, Torre de Energia, Armazém, Centro de Vendas, Oficina de Melhorias, Chiqueiro dos Carregadores e Plataforma Industrial.
+**Estruturas (19), todas com modelo 3D próprio e animado:** Esteira, Esteira Rápida, Cruzamento, Divisor, Seletor, Mineradora, Perfuratriz Avançada, Acampamento Madeireiro, Triturador, Serraria, Fundição, Refinaria, Gerador, Torre de Energia, Armazém, Centro de Vendas, Oficina de Melhorias, Chiqueiro dos Carregadores e Plataforma Industrial.
 
 **Esteiras:** transporte lógico real (até 4 itens por tile), curvas automáticas, velocidades diferentes, bloqueio quando a saída está ocupada (itens aguardam sem se perder), redesenho de direção sem custo, troca de tipo preservando itens. Itens visíveis em movimento via instanciação (sem objetos físicos pesados).
 
@@ -74,7 +87,7 @@ O vídeo do anúncio **não chegou** a ser recebido (só o texto do pedido), e o
 
 ## Testes realmente executados
 
-**Automatizados da simulação** (`npm test`, 11 de 11 aprovados): inicialização, construção válida e inválida, desconto de moedas, extração, transporte por esteira, venda, bloqueio logístico, processamento, melhoria, energia (parada sem gerador, produção com carvão), tecnologias, regiões, economia, salvar/carregar com identificadores preservados, rejeição de salvamento inválido, demolição com reembolso, estabilidade com mais de 300 esteiras. Todos verificam integridade: unidades existentes = criadas − consumidas/vendidas (sem duplicação nem perda).
+**Automatizados da simulação** (`npm test`, 14 de 14 aprovados): inicialização, construção válida e inválida, desconto de moedas, extração, transporte por esteira, venda, bloqueio logístico, processamento, melhoria, energia (parada sem gerador, produção com carvão), tecnologias, regiões, economia, salvar/carregar com identificadores preservados, rejeição de salvamento inválido, demolição com reembolso, estabilidade com mais de 300 esteiras, cruzamento, seletor e desfazer. Todos verificam integridade: unidades existentes = criadas − consumidas/vendidas (sem duplicação nem perda).
 
 **Jogabilidade real** (Electron no Linux com mouse e teclado simulados via Playwright, `tests/e2e/play.cjs`), aprovados: iniciar partida, mover câmera com WASD, construir mineradora clicando, recusar construção sobreposta, traçar 10 esteiras por arraste, extração e venda acontecendo, integridade, melhoria com U, construir triturador, construir Oficina e pesquisar tecnologia. As etapas seguintes do roteiro (energia pela interface, mapa, F5/F9, demolição pela interface) não chegaram a ser concluídas nessa rodada, mas os mesmos sistemas passaram nos testes automatizados acima.
 
@@ -82,8 +95,7 @@ O vídeo do anúncio **não chegou** a ser recebido (só o texto do pedido), e o
 
 ## Recursos pendentes / ideias de expansão
 
-- Junções explícitas e priorização de rotas (hoje várias esteiras podem alimentar uma só, e o Divisor distribui em rodízio).
-- Esteiras em alturas diferentes (pontes).
+- Priorização de rotas entre várias entradas.
 - Desgaste e manutenção das máquinas.
 - Ícone próprio do executável e instalador (`.msi`/NSIS).
 - Mais regiões, recursos e receitas.

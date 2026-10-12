@@ -1,7 +1,7 @@
 // Sistema de máquinas: mineração, processamento por receitas, armazenagem, venda e divisores.
 import { SIM, BUILDINGS, RECIPES, RESOURCES, FUELS, DEPOSITS } from '../../data/config.js';
 import { DEPOSIT_TYPES } from '../WorldMap.js';
-import { addInv, takeInv, invTotal } from '../util.js';
+import { addInv, takeInv, invTotal, DX, DZ } from '../util.js';
 
 const levelSpeed = (b) => 1 + SIM.upgradeSpeedBonus * (b.level - 1);
 const levelCap = (b) => 1 + SIM.upgradeCapBonus * (b.level - 1);
@@ -30,6 +30,7 @@ export function machineAccepts(sim, b, res) {
     case 'seller': return true;
     case 'storage': return invTotal(b.inv) < machineCapacity(sim, b);
     case 'splitter': return invTotal(b.inv) < 2;
+    case 'sorter': return invTotal(b.inv) < 2;
     case 'generator': return !!FUELS[res] && (b.inv[res] || 0) < machineCapacity(sim, b);
     case 'processor': {
       const cap = machineCapacity(sim, b);
@@ -98,6 +99,8 @@ export function updateMachines(sim, dt) {
           invTotal(b.inv) >= machineCapacity(sim, b) ? 'Armazém cheio' : '');
         break;
       case 'splitter': updateSplitter(sim, b, dt); break;
+      case 'sorter': updateSorter(sim, b); break;
+      case 'crossing': updateCrossing(sim, b, dt); break;
       case 'barn': if (b.outputEnabled !== false) emit(sim, b, b.inv); break;
       case 'seller': setState(b, sim.time - (b.lastSale ?? -99) < 3 ? 'working' : 'idle'); break;
       case 'workshop': setState(b, 'working'); break;
@@ -235,4 +238,30 @@ function updateSplitter(sim, b) {
     }
   }
   b.state = 'output_full';
+}
+
+// Seletor: o recurso escolhido sai pela esquerda; os demais seguem em frente.
+function updateSorter(sim, b) {
+  const res = Object.keys(b.inv)[0];
+  if (!res) { b.state = 'idle'; b.reason = b.filter ? '' : 'Escolha o recurso a separar'; return; }
+  const side = b.filter && res === b.filter ? 3 : 0;
+  const dir = (b.rot + side) & 3;
+  if (sim.pushTo(b.x + DX[dir], b.z + DZ[dir], dir, res, b.id)) { takeInv(b.inv, res, 1); b.state = 'working'; b.reason = ''; }
+  else { b.state = 'output_full'; b.reason = side === 3 ? 'Saída lateral (esquerda) bloqueada' : 'Saída frontal bloqueada'; }
+}
+
+// Cruzamento: cada item atravessa o tile em linha reta, na direção em que entrou.
+function updateCrossing(sim, b, dt) {
+  const step = BUILDINGS[b.type].speed * (1 + sim.progression.effect('belt')) * dt;
+  let blocked = false;
+  for (let i = b.items.length - 1; i >= 0; i--) {
+    const it = b.items[i];
+    it.pp = it.p;
+    it.p = Math.min(1, it.p + step);
+    if (it.p >= 1) {
+      if (sim.pushTo(b.x + DX[it.d], b.z + DZ[it.d], it.d, it.r, b.id)) b.items.splice(i, 1);
+      else blocked = true;
+    }
+  }
+  b.state = blocked ? 'blocked' : b.items.length ? 'working' : 'idle';
 }

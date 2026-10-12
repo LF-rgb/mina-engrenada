@@ -29,7 +29,7 @@ export class InputController {
     c.addEventListener('mousedown', (e) => this.onDown(e));
     window.addEventListener('mouseup', (e) => this.onUp(e));
     c.addEventListener('wheel', (e) => { e.preventDefault(); if (this.game.active) this.game.cam.zoom(e.deltaY); }, { passive: false });
-    c.addEventListener('mouseleave', () => { this.game.cam.mouse.inside = false; });
+    c.addEventListener('mouseleave', () => { this.game.cam.mouse.inside = false; this.game.setHoverTip(null); });
     c.addEventListener('mouseenter', () => { this.game.cam.mouse.inside = true; });
     window.addEventListener('keydown', (e) => this.onKey(e, true));
     window.addEventListener('keyup', (e) => this.onKey(e, false));
@@ -56,6 +56,7 @@ export class InputController {
     if (!this.sim.isUnlocked(type)) { this.ui.toast('Pesquise esta estrutura na Oficina (T)', 'err'); this.game.audio.play('error'); return; }
     if (this.mode === 'build' && this.buildType === type) { this.cancel(); return; }
     this.mode = 'build'; this.buildType = type; this.moveId = 0;
+    this.game.setHoverTip(null);
     this.game.audio.play('click');
     this.game.renderer.clearGhost();
     this.enterOverlay();
@@ -73,6 +74,7 @@ export class InputController {
   }
   startDemolish() {
     this.mode = this.mode === 'demolish' ? 'select' : 'demolish';
+    this.game.setCursorTip('');
     this.buildType = null;
     this.game.renderer.clearGhost();
     this.game.renderer.terrain.grid.visible = false;
@@ -85,6 +87,7 @@ export class InputController {
   }
   cancel() {
     this.mode = 'select'; this.buildType = null; this.moveId = 0; this.drag = null;
+    this.game.setCursorTip('');
     this.game.renderer.clearGhost();
     this.game.renderer.terrain.grid.visible = false;
     this.game.renderer.showPowerCoverage(false);
@@ -116,12 +119,20 @@ export class InputController {
     if (!p) return;
     this.hover = p;
     if (this.mode === 'build' || this.mode === 'move') this.updateGhost(p);
-    else this.game.renderer.setHover(p.x, p.z, true);
+    else {
+      this.game.renderer.setHover(p.x, p.z, true);
+      if (this.mode === 'select') {
+        const hb = this.sim.at(p.x, p.z);
+        this.hoverBuilding = hb || null;
+        this.game.setHoverTip(hb, p);
+      }
+    }
     if (this.mode === 'demolish' && this.drag) this.demolishAt(p.x, p.z, true);
   }
 
   updateGhost(p) {
     const type = this.buildType;
+    if (!type || !BUILDINGS[type]) return;
     const def = BUILDINGS[type];
     if (def.kind === 'belt' && this.drag) {
       this.game.renderer.showBeltPath(this.beltPathTiles(this.drag, p));
@@ -157,9 +168,10 @@ export class InputController {
       const a = this.anchor(this.buildType, p.fx, p.fz, this.rot);
       const b = this.sim.placeBuilding(this.buildType, a.x, a.z, this.rot);
       if (b) {
+        if (b.id) this.game.pushUndo([b.id]);
         this.game.audio.play('place');
         if (!e.shiftKey && def.kind !== 'platform') { this.cancel(); if (b.id) this.ui.select(b); }
-        this.updateGhost(p);
+        else this.updateGhost(p);
       } else this.game.audio.play('error');
       return;
     }
@@ -224,6 +236,7 @@ export class InputController {
 
   placeBeltPath(tiles) {
     let placed = 0, changed = 0, failed = 0;
+    const ids = [];
     for (const t of tiles) {
       const ex = this.sim.at(t.x, t.z);
       if (ex && BUILDINGS[ex.type].kind === 'belt') {
@@ -235,12 +248,12 @@ export class InputController {
           ex.items = []; // itens migram para a nova esteira
           this.sim.demolish(ex.id);
           const nb = this.sim.placeBuilding(this.buildType, t.x, t.z, t.rot, { silent: true });
-          if (nb) { nb.items = items; placed++; } else failed++;
+          if (nb) { nb.items = items; placed++; ids.push(nb.id); } else failed++;
         } else if (this.sim.setBeltDir(ex.id, t.rot)) changed++;
         continue;
       }
       const b = this.sim.placeBuilding(this.buildType, t.x, t.z, t.rot, { silent: true });
-      if (b) placed++; else failed++;
+      if (b) { placed++; ids.push(b.id); } else failed++;
     }
     if (placed || changed) this.game.audio.play(placed ? 'place' : 'rotate');
     if (failed) {
@@ -248,7 +261,7 @@ export class InputController {
       const why = this.sim.economy.money < BUILDINGS[this.buildType].cost ? 'moedas insuficientes' : 'local bloqueado';
       this.ui.toast(`${failed} segmento(s) não construído(s): ${why}`, 'err');
     }
-    if (placed) this.sim.events.emit('built', { type: this.buildType, count: placed });
+    if (placed) { this.sim.events.emit('built', { type: this.buildType, count: placed }); this.game.pushUndo(ids); }
   }
 
   demolishAt(x, z, beltsOnly) {
@@ -287,6 +300,17 @@ export class InputController {
       return;
     }
     const sel = this.ui.selected?.kind === 'building' ? this.sim.buildings.get(this.ui.selected.id) : null;
+    if (code === 'KeyZ' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); this.game.undo(); return; }
+    if (code === 'KeyC' && !e.ctrlKey) {
+      // conta-gotas: copia tipo e rotação da estrutura sob o mouse (ou da selecionada)
+      const src = (this.hover && this.sim.at(this.hover.x, this.hover.z)) || sel;
+      if (src) {
+        this.rot = src.rot;
+        if (this.mode === 'build' && this.buildType === src.type) this.cancel();
+        this.startBuild(src.type);
+      }
+      return;
+    }
     switch (code) {
       case 'KeyR':
         this.rot = (this.rot + (e.shiftKey ? 3 : 1)) & 3;
